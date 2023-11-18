@@ -186,16 +186,16 @@ public class AccountsDAO {
 	//トランザクション用メソッド
 	public boolean saveUserTransaction(User user) {
 		//JDBCドライバを読み込む
-		dao.loadJDBCDriver();
+		loadJDBCDriver();
 		//データベース接続
 		try (Connection conn = DriverManager.getConnection(AccountsDAO.getJDBC_URL(), AccountsDAO.getDB_USER(), AccountsDAO.getDB_PASS())) {
 			//トランザクションの開始
 			conn.setAutoCommit(false);			
 			try {
 				//登録前にユーザーIDとパスワードだけをDBに保存する
-				if (dao.saveUserIdAndPass(conn, user)) {
+				if (saveUserIdAndPass(user)) {
 					//登録後に全てのカラムへ保存する
-					if (dao.saveUser(conn, user)) {
+					if (saveUser(user)) {
 						//トランザクションのコミット
 						conn.commit();
 						System.out.println("トランザクションが正常に完了しました");
