@@ -2,10 +2,6 @@
 
 package model;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-
 public class ResisterConfirmLogic {
 	AccountsDAO dao = new AccountsDAO();
 	
@@ -22,11 +18,12 @@ public class ResisterConfirmLogic {
 		if (userIdUniqueResolt == false) {
 			return false;
 		}	
+	//DBへの保存（1回目）
+	dao.saveUserIdAndPass(user);
 	return true;
 	}
 	
-	//DBへの保存（1回目）
-	dao.saveUserIdAndPass(user);
+	
 	
 	//DBへの保存（2回目）
 	
