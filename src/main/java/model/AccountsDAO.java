@@ -119,7 +119,7 @@ public class AccountsDAO {
 	}	
 	
 	//登録前にユーザーIDとパスワードだけをDBに保存するメソッド(１回目の保存)
-	public boolean saveUserIdAndPass(User user) throws SQLException {
+	public boolean saveUserIdAndPass(User user){
 		//JDBCドライバを読み込む
 		loadJDBCDriver();
 		//パスワードのハッシュ＆ソルト化
@@ -130,24 +130,25 @@ public class AccountsDAO {
 		try (Connection conn = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASS)) {
 			//SQL文
 			String sql = "insert into accounts(user_Id, pass, mail, name, age) values(?, ?, 'dummy@example.com', 'ダミー名前', 20)";			
-			try (PreparedStatement pStmt = conn.prepareStatement(sql)) {
-				pStmt.setString(1, user.getRUserId());
-				pStmt.setString(2, hashedPass);
+			PreparedStatement pStmt = conn.prepareStatement(sql);
+			pStmt.setString(1, user.getRUserId());
+			pStmt.setString(2, hashedPass);
 
 			//変更した行数を取得
-			int rowCount = pStmt.executeUpdate();
-			
+			int rowCount = pStmt.executeUpdate();			
 			if(rowCount > 0) {
 				System.out.println("ユーザーIDとパスワードをDBへ保存しました");
 				return true;
-			}			
+			} else {
+				System.out.println("ユーザーIDとパスワードを保存できませんでした");
+				return false;
+			}		
 		} catch(SQLException e) {
 			e.printStackTrace();
-			return false;		
-		  }
-		return false;
-		}	
-	}
+			return false; 		
+		}
+	} 
+		 
 		
 	//登録後に全てのカラムへ保存するメソッド（２回目の保存）
 	public boolean saveUser(User user) throws SQLException {	
@@ -157,32 +158,28 @@ public class AccountsDAO {
 		try (Connection conn = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASS)) { 
 			//SQL文
 			String sql = "update accounts set mail=?, name=?, age=? where user_id = ?";			
-			try (PreparedStatement pStmt = conn.prepareStatement(sql)) {
-				pStmt.setString(1, user.getRMail());
-				pStmt.setString(2, user.getRName());
-				pStmt.setInt(3, user.getRAge());
-				pStmt.setString(4, user.getRUserId());
+			PreparedStatement pStmt = conn.prepareStatement(sql);
+			pStmt.setString(1, user.getRMail());
+			pStmt.setString(2, user.getRName());
+			pStmt.setInt(3, user.getRAge());
+			pStmt.setString(4, user.getRUserId());
 
-				//変更した行数を取得
-				int rowCount = pStmt.executeUpdate();
-				
-				if(rowCount > 0) {
-					System.out.println("ユーザー情報を登録しました");
-					return true;
-				} else {
-					System.out.println("ユーザー情報を登録できませんでした");
-				  return false;
-				}
-			} 
-		
+			//変更した行数を取得
+			int rowCount = pStmt.executeUpdate();
 			
-		}catch (SQLException e) {
+			if(rowCount > 0) {
+				System.out.println("ユーザー情報を登録しました");
+				return true;
+			} else {
+				System.out.println("ユーザー情報を登録できませんでした");
+			  return false;
+			}
+		} catch (SQLException e) {
 			e.printStackTrace();
-			return false;
-		}			
-		//return false;
-	}	
-	
+			return false; 
+		}	
+	}			
+			
 	//トランザクション用メソッド
 	public boolean saveUserTransaction(User user) {
 		//JDBCドライバを読み込む
@@ -190,27 +187,22 @@ public class AccountsDAO {
 		//データベース接続
 		try (Connection conn = DriverManager.getConnection(AccountsDAO.getJDBC_URL(), AccountsDAO.getDB_USER(), AccountsDAO.getDB_PASS())) {
 			//トランザクションの開始
-			conn.setAutoCommit(false);			
-			try {
-				//登録前にユーザーIDとパスワードだけをDBに保存する
-				if (saveUserIdAndPass(user)) {
-					//登録後に全てのカラムへ保存する
-					if (saveUser(user)) {
-						//トランザクションのコミット
-						conn.commit();
-						System.out.println("トランザクションが正常に完了しました");
-						return true;
-					}
-				}				
-				//トランザクションのロールバック
-				conn.rollback();
-				System.out.println("トランザクションをロールバックしました");
-			} catch (SQLException e) {
-				//トランザクションのロールバック
-				conn.rollback();
-				System.out.println("トランザクションをロールバックしました");
-				e.printStackTrace();
-			}
+			conn.setAutoCommit(false);
+			
+			//登録前にユーザーIDとパスワードだけをDBに保存する
+			if (saveUserIdAndPass(user)) {
+				//登録後に全てのカラムへ保存する
+				if (saveUser(user)) {
+					//トランザクションのコミット
+					conn.commit();
+					System.out.println("トランザクションが正常に完了しました");
+					return true;
+				}
+			}				
+			//トランザクションのロールバック
+			conn.rollback();
+			System.out.println("トランザクションをロールバックしました");					
+			
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
