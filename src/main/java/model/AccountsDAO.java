@@ -151,7 +151,7 @@ public class AccountsDAO {
 		 
 		
 	//登録後に全てのカラムへ保存するメソッド（２回目の保存）
-	public boolean saveUser(User user) throws SQLException {	
+	public boolean saveUser(User user){	
 		//JDBCドライバを読み込む
 		loadJDBCDriver();
 		//データベース接続
