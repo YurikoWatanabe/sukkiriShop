@@ -68,14 +68,18 @@ public class RegisterServlet extends HttpServlet {
 			}	
 		//actionパラメータがdoneなら、残りの入力値をDBへ保存、メイン画面へ
 		} else if (action.equals("done")) {
-			//DBへ保存
-			boolean result = bo.resister(user);	
+			//DBへ保存（2回目）
+			boolean result = bo.saveSecond(user);
+			//トランザクション
+			boolean result2 =  bo.Transaction(user);
 			//メイン画面へフォワード
-			if (result) {
+			if (result && result2) {
 				RequestDispatcher dispatcher = request.getRequestDispatcher("WEB-INF/jsp/loginOK.jsp");
 				dispatcher.forward(request, response);
 			} else {
 				System.out.println("失敗：action" + action);
+				//resultとresult2がfalseならリダイレクト
+				response.sendRedirect("RegisterServlet");
 			}
 			
 		}
