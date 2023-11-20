@@ -24,30 +24,26 @@ public class AccountsDAO {
 		//設定情報を読み込む
 		Properties properties = new Properties();
 		try (InputStream input = AccountsDAO.class.getClassLoader().getResourceAsStream("config.properties")){
-			properties.load(input);
-			JDBC_URL = properties.getProperty("JDBC_URL");
-			DB_USER = properties.getProperty("DB_USER");
-			DB_PASS = properties.getProperty("DB_PASS");		
+			if (input != null) {
+				properties.load(input);
+				JDBC_URL = properties.getProperty("JDBC_URL");
+				DB_USER = properties.getProperty("DB_USER");
+				DB_PASS = properties.getProperty("DB_PASS");
+			} else {
+				System.out.println("config.propertiesファイルが見つかりません");
+				JDBC_URL = null;
+				DB_USER = null;
+				DB_PASS = null;
+			}
+					
 		} catch (IOException e) {
 		e.printStackTrace();
-		throw new RuntimeException("Failed to load configuration properties.");
+		throw new RuntimeException("Failed to load confiiguration properties");
 		}
 	}
 	
-	//クラス定数のゲッター(いらないかも？)
-	public static String getJDBC_URL() {
-		return JDBC_URL;
-	}
-	public static String getDB_USER() {
-		return DB_USER;
-	}
-	public static String getDB_PASS() {
-		return DB_PASS;
-	}
-	
-	
-	//JDBCドライバを読み込むメソッド
-	protected void loadJDBCDriver() {
+	//JDBCドライバを読み込むメソッド//テストのためprotectedからpublicへ一時変更
+	public void loadJDBCDriver() {
 		try {
 			Class.forName("org.h2.Driver");			
 		}catch(ClassNotFoundException e) {
@@ -185,7 +181,7 @@ public class AccountsDAO {
 		//JDBCドライバを読み込む
 		loadJDBCDriver();
 		//データベース接続
-		try (Connection conn = DriverManager.getConnection(AccountsDAO.getJDBC_URL(), AccountsDAO.getDB_USER(), AccountsDAO.getDB_PASS())) {
+		try (Connection conn = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASS)) {
 			//トランザクションの開始
 			conn.setAutoCommit(false);
 			
