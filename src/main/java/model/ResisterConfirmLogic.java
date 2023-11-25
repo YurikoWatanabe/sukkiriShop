@@ -2,6 +2,8 @@
 
 package model;
 
+import model.AccountsDAO.TransactionStatus;
+
 public class ResisterConfirmLogic {
 	AccountsDAO dao = new AccountsDAO();
 	
@@ -18,22 +20,10 @@ public class ResisterConfirmLogic {
 		if (userIdUniqueResolt == false) {
 			return false;
 		}	
-	//DBへの保存（1回目）
-	dao.saveUserIdAndPass(user);
 	return true;
 	}	
-	
-	//ビジネスロジック・DBへの保存（2回目）
-	public boolean saveSecond(User user) {
-		//2回目の保存
-		return dao.saveUser(user);		
-	}
-	
-	//ビジネスロジック・トランザクション
-	public boolean Transaction(User user) {
-		//トランザクション
-		return dao.saveUserTransaction(user);
-	}
-	
-	
+	//トランザクション
+	public TransactionStatus firstSecondSave(User user, String action) {
+		return dao.saveUserTransaction(user, action);		
+	}	
 }
