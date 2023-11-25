@@ -42,6 +42,18 @@ public class AccountsDAO {
 		}
 	}
 	
+	//トランザクションの結果を格納する変数の初期化
+	static Boolean firstSaveSuccess = null;
+	static Boolean secondSaveSuccess = null;
+	
+	//テスト用のセッター
+	public void setFirstSaveSuccess(Boolean value) {
+		firstSaveSuccess = value;
+	}
+	public void setSecondSaveSuccess(Boolean value) {
+		secondSaveSuccess = value;
+	}
+	
 	//JDBCドライバを読み込むメソッド//テストのためprotectedからpublicへ一時変更
 	public void loadJDBCDriver() {
 		try {
@@ -175,34 +187,69 @@ public class AccountsDAO {
 			return false; 
 		}	
 	}			
-			
+	
+	//トランザクションの戻り値を定義
+	public enum TransactionStatus {
+		SUCCESS,
+		PENDING,
+		FAILURE,
+	}
+	
 	//トランザクション用メソッド
-	public boolean saveUserTransaction(User user) {
+	public TransactionStatus saveUserTransaction(User user, String action) {
 		//JDBCドライバを読み込む
-		loadJDBCDriver();
+		loadJDBCDriver();		
 		//データベース接続
 		try (Connection conn = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASS)) {
 			//トランザクションの開始
-			conn.setAutoCommit(false);
-			
-			//登録前にユーザーIDとパスワードだけをDBに保存する
-			if (saveUserIdAndPass(user)) {
-				//登録後に全てのカラムへ保存する
-				if (saveUser(user)) {
-					//トランザクションのコミット
-					conn.commit();
-					System.out.println("トランザクションが正常に完了しました");
-					return true;
-				}
-			}				
-			//トランザクションのロールバック
-			conn.rollback();
-			System.out.println("トランザクションをロールバックしました");					
-			
+			conn.setAutoCommit(false);				
+			try {
+				//actionの値が「null」かつ1回目の保存がまだなら実行
+				if (action == null && firstSaveSuccess == null) {
+					firstSaveSuccess = saveUserIdAndPass(user);						
+					//1回目が成功かつ2回目が未実施の場合
+					if (firstSaveSuccess == true && secondSaveSuccess == null) {
+						//2回目がまだ未定なのでトランザクションを保留
+						System.out.println("2回目の保存が未定のため、トランザクションを保留にしました" + "firstSaveSuccessの値：" + firstSaveSuccess);
+						return TransactionStatus.PENDING;
+						//1回目が失敗した場合ロールバック
+					} else {
+						conn.rollback();
+						System.out.println("1回目の保存が失敗したため、トランザクションをロールバックしました");
+						return TransactionStatus.FAILURE;
+					}	
+				}//actionの値が「done」かつfirstSaveSuccessがtrueなら2回目を実行
+				else if (action.equals("done") && firstSaveSuccess == true) {
+					secondSaveSuccess = saveUser(user);
+					//1回目と2回目が成功した場合コミット
+					if (firstSaveSuccess == true && secondSaveSuccess == true) {
+						conn.commit();
+						System.out.println("トランザクションが正常に完了しました");
+						return TransactionStatus.SUCCESS;
+					} else {						
+						//2回目が失敗したのでロールバック
+						conn.rollback();
+						System.out.println("2回目の保存に失敗したため、トランザクションをロールバックしました" + "firstSaveSuccessの値：" + firstSaveSuccess + " secondSaveSuccessの値：" + secondSaveSuccess);												
+						return TransactionStatus.FAILURE;
+					}
+				} else {
+					//不明なアクションのためロールバック
+					conn.rollback();
+					System.out.println("不明なアクションのため、トランザクションをロールバックしました");
+					return TransactionStatus.FAILURE;
+				} 						
+			} catch (SQLException e) {
+				e.printStackTrace();
+				conn.rollback();
+				System.out.println("トランザクションをロールバックしました");
+				return TransactionStatus.FAILURE;
+			} 			
 		} catch (SQLException e) {
 			e.printStackTrace();
-		}
-		return false;
+			return TransactionStatus.FAILURE;
+								
+		} 	
 	}
-	
+
 }
+

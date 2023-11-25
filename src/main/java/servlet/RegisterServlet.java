@@ -10,6 +10,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
+import model.AccountsDAO.TransactionStatus;
 import model.ResisterConfirmLogic;
 import model.User;
 
@@ -45,10 +46,10 @@ public class RegisterServlet extends HttpServlet {
 		User user = new User(rUserId, rPass, rPass2, rMail, rName, rAge);	
 		
 		//actionパラメータによって処理振り分け
-		//actionパラメータがnullなら入力値チェック～セッションへ保存（rUserIdとrPassのみDBへ保存）
+		//actionパラメータがnullなら入力値チェック～セッションへ保存とrUserIdとrPassのみDBへ保存（トランザクション）
 		if (action == null) {
-			//入力値チェックを実行					
-			boolean result = bo.confirm(user);
+			//入力値チェックと1回目のDB保存実行					
+			boolean confirmResult = bo.confirm(user);
 			
 			//入力値を個別で保存（Userクラスにはパスワードも含まれているため）
 			HttpSession session = request.getSession();
@@ -57,40 +58,36 @@ public class RegisterServlet extends HttpServlet {
 			session.setAttribute("rName", rName);
 			session.setAttribute("rAge", rAge);
 			
-			//チェックの結果によって分岐
-			if (result) {
-				//resultがtrueなら確認画面へフォワード				
-				RequestDispatcher dispatcher = request.getRequestDispatcher("WEB-INF/jsp/registerConfilm.jsp");
-				dispatcher.forward(request, response);
+			//入力値チェックがtrueならトランザクション実行
+			if (confirmResult == true) {
+				TransactionStatus traResult = bo.firstSecondSave(user, action);
+				//トランザクションの結果によって分岐/PENDINGなら確認画面へフォワード
+				if (traResult == TransactionStatus.PENDING) {
+					RequestDispatcher dispatcher = request.getRequestDispatcher("WEB-INF/jsp/registerConfilm.jsp");
+					dispatcher.forward(request, response);				
+				//FAILUREなら入力画面へリダイレクト
+				} else if (traResult == TransactionStatus.FAILURE) {
+					response.sendRedirect("RegisterServlet");
+				}
+			//入力値チェックがtrueでないなら入力画面へリダイレクト
 			} else {
-				//resultがfalseならリダイレクト
 				response.sendRedirect("RegisterServlet");
 			}	
-		//actionパラメータがdoneなら、残りの入力値をDBへ保存、メイン画面へ
+		//actionパラメータがdoneなら2回目のトランザクション実行
 		} else if (action.equals("done")) {
-			//DBへ保存（2回目）
-			boolean result = bo.saveSecond(user);
-			//トランザクション
-			boolean result2 =  bo.Transaction(user);
-			//メイン画面へフォワード
-			if (result && result2) {
+			TransactionStatus traResult2 = bo.firstSecondSave(user, action);
+			//トランザクションの結果によって分岐/SUCCESSならトップ画面へフォワード
+			if (traResult2 == TransactionStatus.SUCCESS) {
 				RequestDispatcher dispatcher = request.getRequestDispatcher("WEB-INF/jsp/loginOK.jsp");
 				dispatcher.forward(request, response);
+				//SUCCESS以外なら入力画面へリダイレクト
 			} else {
-				System.out.println("失敗：action" + action);
-				//resultとresult2がfalseならリダイレクト
 				response.sendRedirect("RegisterServlet");
+				System.out.println("2回目のトランザクションが失敗しました");
 			}
 			
-		}
-		
-		
-		
-		
-		
-		
-		
-		
+		}		
 	}
-
 }
+
+
