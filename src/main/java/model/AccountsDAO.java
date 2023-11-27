@@ -65,11 +65,11 @@ public class AccountsDAO {
 			try (Connection conn = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASS)) {
 				//SQL文
 				String sql = "select * from accounts where user_id = ? and pass = ?";			
-				PreparedStatement pStmt = conn.prepareStatement(sql);
-				pStmt.setString(1, login.getUserId());
-				pStmt.setString(2, login.getPass());
+				PreparedStatement pstmt = conn.prepareStatement(sql);
+				pstmt.setString(1, login.getUserId());
+				pstmt.setString(2, login.getPass());
 				//結果表を取得
-				ResultSet rs = pStmt.executeQuery();
+				ResultSet rs = pstmt.executeQuery();
 				
 				if(rs.first()) {
 					String userId = rs.getString("user_id");
@@ -95,11 +95,11 @@ public class AccountsDAO {
 		try (Connection conn = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASS)) {
 			//SQL文（該当のユーザーIDを検索、存在するレコード数を求める）
 			String sql = "select count(*) as count from accounts where user_id = ?";
-			PreparedStatement pStmt = conn.prepareStatement(sql);
-			pStmt.setString(1, user.getRUserId());
+			PreparedStatement pstmt = conn.prepareStatement(sql);
+			pstmt.setString(1, user.getRUserId());
 			
 			//結果表(レコード数)を取得
-			ResultSet rs = pStmt.executeQuery();
+			ResultSet rs = pstmt.executeQuery();
 			
 			//レコード数が1以上なら重複あり
 			if(rs.next()) {		
@@ -153,27 +153,27 @@ public class AccountsDAO {
 //		}
 //	}
 		
-	//ユーザー情報をDBに仮保存するメソッド
+	//ユーザー情報を一時テーブルに仮保存するメソッド
 	public boolean preSaveUser(Connection conn, User user){
 		//パスワードのハッシュ＆ソルト化
 		BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 		String hashedPass = encoder.encode(user.getRPass());
 		//SQL文
-		String sql = "insert into accounts(user_Id, pass, mail, name, age) values(?, ?, ?, ?, ?)";	
-		try (PreparedStatement pStmt = conn.prepareStatement(sql)) {					
-			pStmt.setString(1, user.getRUserId());
-			pStmt.setString(2, hashedPass);
-			pStmt.setString(3, user.getRMail());
-			pStmt.setString(4, user.getRName());
-			pStmt.setInt(5, user.getRAge());
+		String sql = "insert into temporary_table (user_Id, pass, mail, name, age) values(?, ?, ?, ?, ?)";	
+		try (PreparedStatement pstmt = conn.prepareStatement(sql)) {					
+			pstmt.setString(1, user.getRUserId());
+			pstmt.setString(2, hashedPass);
+			pstmt.setString(3, user.getRMail());
+			pstmt.setString(4, user.getRName());
+			pstmt.setInt(5, user.getRAge());
 			
 			//変更した行数を取得
-			int rowCount = pStmt.executeUpdate();			
+			int rowCount = pstmt.executeUpdate();			
 			if(rowCount > 0) {
-				System.out.println("ユーザー情報をDBへ仮保存しました");
+				System.out.println("ユーザー情報を一時テーブルへ仮保存しました");
 				return true;
 			} else {
-				System.out.println("ユーザー情報を仮保存できませんでした");
+				System.out.println("ユーザー情報を一時テーブルへ仮保存できませんでした");
 				return false;
 			}		
 		} catch(SQLException e) {
@@ -181,7 +181,35 @@ public class AccountsDAO {
 			return false; 		
 		}
 	} 
-		 
+	
+	//一時テーブルのユーザー情報をaccountsテーブルへ移動するメソッド
+	public boolean saveUser(Connection conn) {
+		//SQL文
+		String sql = "insert into accounts (user_id, pass, mail, name, age) select user_id, pass, mail, name, age from temporary_table";
+		try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+			pstmt.executeUpdate();
+			return true;
+		} catch(SQLException e) {
+			e.printStackTrace();
+			return false; 		
+		}
+	}
+	
+	//一時テーブルのデータを削除するメソッド
+	public boolean deletePreSaveUser (Connection conn) {
+		//SQL文
+		String sql = "delete from temporary_table";
+		try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+			 pstmt.executeUpdate();
+			 return true;
+		} catch (SQLException e) {
+			e.printStackTrace();
+			return false;
+		}
+		
+	}
+
+	
 		
 	//登録後に全てのカラムへ保存するメソッド（２回目の保存）
 //	public boolean saveUser(Connection conn, String sUserId, String sMail, String sName, Integer sAge){	
@@ -221,37 +249,36 @@ public class AccountsDAO {
 		//JDBCドライバを読み込む
 		loadJDBCDriver();		
 		//データベース接続
-		try (Connection conn = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASS)) {
-			//トランザクションの開始
-			conn.setAutoCommit(false);				
+		try (Connection conn = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASS)) {			
+					
 			try {
-				//actionの値が「null」かつ仮保存がまだなら実行
+				//actionの値が「null」かつ仮保存がまだなら一時テーブルへ保存
 				if (action == null && preSaveSuccess == null) {
 					preSaveSuccess = preSaveUser(conn, user);						
-					//仮保存が成功か登録は未確定の場合
+					//一時テーブルへの保存が成功かつaccountsテーブルへの保存は未確定の場合
 					if (preSaveSuccess && SaveSuccess == null) {
-						//まだ未登録なのでトランザクションを保留
 						System.out.println("登録未確定のため、トランザクションを保留にしました");
 						return TransactionStatus.PENDING;
 						//仮保存が失敗した場合ロールバック
 					} else {
 						conn.rollback();
-						System.out.println("仮保存が失敗したため、トランザクションをロールバックしました");
+						System.out.println("一時テーブルへの保存が失敗したため、トランザクションをロールバックしました");
 						return TransactionStatus.FAILURE;
 					}	
-				}//actionの値が「done」かつpreSaveSuccessがtrueなら登録確定（コミットする）
+				}//actionの値が「done」かつpreSaveSuccessがtrueなら登録確定（accountsテーブルへ保存＆コミット）
 				else if (action.equals("done") && preSaveSuccess) {
-					SaveSuccess = true;	
+					//トランザクションの開始
+					conn.setAutoCommit(false);		
+					SaveSuccess = saveUser(conn);														
 					//コミット
 					conn.commit();
-					System.out.println("トランザクションが正常に完了しました");
+					System.out.println("トランザクションが正常に完了しました。一時保存データを削除し、accountsテーブルへ保存しなおしました");
 					return TransactionStatus.SUCCESS;
-					
 				} else {
-					//不明なアクションのためロールバック
-					conn.rollback();
-					System.out.println("不明なアクションのため、トランザクションをロールバックしました");
-					return TransactionStatus.FAILURE;
+						//不明なアクションのためロールバック
+						conn.rollback();
+						System.out.println("不明なアクションのため、トランザクションをロールバックしました");
+						return TransactionStatus.FAILURE;
 				} 						
 			} catch (SQLException e) {
 				e.printStackTrace();
