@@ -119,40 +119,7 @@ public class AccountsDAO {
 	return true;
 	}	
 	
-	//DBへ登録処理
-//	public boolean saveUser(User user){
-//		//JDBCドライバを読み込む
-//		loadJDBCDriver();	
-//		//パスワードのハッシュ＆ソルト化
-//		BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-//		String hashedPass = encoder.encode(user.getRPass());
-//		//データベース接続
-//		try (Connection conn = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASS)) {
-//			//SQL文
-//			String sql = "insert into accounts(user_Id, pass, mail, name, age) values(?, ?, ?, ?, ?)";
-//			PreparedStatement pStmt = conn.prepareStatement(sql);
-//			pStmt.setString(1, user.getRUserId());
-//			pStmt.setString(2, hashedPass);
-//			pStmt.setString(3, user.getRMail());
-//			pStmt.setString(4, user.getRName());
-//			pStmt.setInt(5, user.getRAge());
-//			
-//			//変更した行数を取得
-//			int rowCount = pStmt.executeUpdate();			
-//			if(rowCount > 0) {
-//				System.out.println("ユーザー情報をDBへ保存しました");
-	
-//				return true;
-//			} else {
-//				System.out.println("ユーザー情報をDBへ保存できませんでした");
-//				return false;
-//			}		
-//		} catch(SQLException e) {
-//			e.printStackTrace();
-//			return false; 		
-//		}
-//	}
-		
+
 	//ユーザー情報を一時テーブルに仮保存するメソッド
 	public boolean preSaveUser(Connection conn, User user){
 		//パスワードのハッシュ＆ソルト化
@@ -196,47 +163,27 @@ public class AccountsDAO {
 	}
 	
 	//一時テーブルのデータを削除するメソッド
-	public boolean deletePreSaveUser (Connection conn) {
-		//SQL文
-		String sql = "delete from temporary_table";
-		try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-			 pstmt.executeUpdate();
-			 return true;
+	public boolean deletePreSaveUser () {
+		//JDBCドライバを読み込む
+		loadJDBCDriver();		
+		//データベース接続
+		try (Connection deleteConn = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASS)) {		
+			//SQL文
+			String sql = "delete from temporary_table";
+			try (PreparedStatement pstmt = deleteConn.prepareStatement(sql)) {
+				 pstmt.executeUpdate();
+				 System.out.println("一時テーブルのデータを削除しました");
+				 return true;
+			} catch (SQLException e) {
+				e.printStackTrace();
+				return false;
+			}
 		} catch (SQLException e) {
 			e.printStackTrace();
 			return false;
-		}
-		
+		}		
 	}
 
-	
-		
-	//登録後に全てのカラムへ保存するメソッド（２回目の保存）
-//	public boolean saveUser(Connection conn, String sUserId, String sMail, String sName, Integer sAge){	
-//		//SQL文
-//		String sql = "update accounts set mail=?, name=?, age=? where user_id = ?";
-//		try (PreparedStatement pStmt = conn.prepareStatement(sql)) { 			
-//			pStmt.setString(1, sMail);
-//			pStmt.setString(2, sName);
-//			pStmt.setInt(3, sAge);
-//			pStmt.setString(4, sUserId);
-//
-//			//変更した行数を取得
-//			int rowCount = pStmt.executeUpdate();
-//			
-//			if(rowCount > 0) {
-//				System.out.println("ユーザー情報を登録しました");
-//				return true;
-//			} else {
-//				System.out.println("ユーザー情報を登録できませんでした。rowCountの値：" + rowCount);
-//			  return false;
-//			}
-//		} catch (SQLException e) {
-//			e.printStackTrace();
-//			return false; 
-//		}	
-//	}			
-//	
 	//トランザクションの戻り値を定義
 	public enum TransactionStatus {
 		SUCCESS,
@@ -269,9 +216,10 @@ public class AccountsDAO {
 				else if (action.equals("done") && preSaveSuccess) {
 					//トランザクションの開始
 					conn.setAutoCommit(false);		
-					SaveSuccess = saveUser(conn);														
+					SaveSuccess = saveUser(conn);						
 					//コミット
 					conn.commit();
+					SaveSuccess = deletePreSaveUser();
 					System.out.println("トランザクションが正常に完了しました。一時保存データを削除し、accountsテーブルへ保存しなおしました");
 					return TransactionStatus.SUCCESS;
 				} else {
