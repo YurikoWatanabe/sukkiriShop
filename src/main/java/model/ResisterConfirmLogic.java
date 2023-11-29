@@ -7,7 +7,7 @@ import model.AccountsDAO.TransactionStatus;
 public class ResisterConfirmLogic {
 	AccountsDAO dao = new AccountsDAO();
 	
-	//ビジネスロジック・バリデーション
+	//バリデーション
 	public boolean confirm(User user) {
 		//入力値チェック
 		UserValidation valid = new UserValidation();		
@@ -15,6 +15,7 @@ public class ResisterConfirmLogic {
 		if (validResolt == false) {
 			return false;
 		}
+		
 		//ユーザーIDの重複チェック
 		boolean userIdUniqueResolt = dao.isUserIdUnique(user);
 		if (userIdUniqueResolt == false) {
@@ -23,7 +24,7 @@ public class ResisterConfirmLogic {
 	return true;
 	}	
 	//トランザクション
-	public TransactionStatus firstSecondSave(User user, String action) {
+	public TransactionStatus traSaveUser(User user, String action) {
 		return dao.saveUserTransaction(user, action);		
-	}	
+	}	 	
 }
