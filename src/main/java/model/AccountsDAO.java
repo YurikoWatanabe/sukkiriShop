@@ -58,30 +58,41 @@ public class AccountsDAO {
 	
 	//テーブルからログイン情報を検索するメソッド
 	public Account findByLogin(Login login) {
-		Account account = null;
-			//JDBCドライバを読み込む
-			loadJDBCDriver();
+		Account account = null;		
+		//JDBCドライバを読み込む
+		loadJDBCDriver();
 			//データベース接続
 			try (Connection conn = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASS)) {
 				//SQL文
-				String sql = "select * from accounts where user_id = ? and pass = ?";			
+				String sql = "select * from accounts where user_id = ?";			
 				PreparedStatement pstmt = conn.prepareStatement(sql);
 				pstmt.setString(1, login.getUserId());
-				pstmt.setString(2, login.getPass());
 				//結果表を取得
 				ResultSet rs = pstmt.executeQuery();
 				
 				if(rs.first()) {
-					String userId = rs.getString("user_id");
-					String pass = rs.getString("pass");
-					String mail = rs.getString("mail");
-					String name = rs.getString("name");
-					int age = rs.getInt("age");
-					account = new Account(userId,pass, mail, name, age);
+					//passカラムの値を取得
+					String hashedPass = rs.getString("pass");
+					//パスワードを比較
+					BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+					if (encoder.matches(login.getPass(), hashedPass)) {						
+						String userId = rs.getString("user_id");
+						String pass = hashedPass;
+						String mail = rs.getString("mail");
+						String name = rs.getString("name");
+						int age = rs.getInt("age");
+						account = new Account(userId,pass, mail, name, age);
+						System.out.println("データがヒットしました");						
+					} else {
+						System.out.println("パスうわーどが一致しません");
+					}					
+				} else {
+					System.out.println("ユーザーIDが見つかりません");
 				}
 				
 			}catch(SQLException e) {
 				e.printStackTrace();
+				System.out.println("データがヒットしませんでした");
 				return null;
 			}
 		return account;
@@ -119,15 +130,22 @@ public class AccountsDAO {
 	return true;
 	}	
 	
-
 	//ユーザー情報を一時テーブルに仮保存するメソッド
 	public boolean preSaveUser(Connection conn, User user){
 		//パスワードのハッシュ＆ソルト化
 		BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 		String hashedPass = encoder.encode(user.getRPass());
-		//SQL文
+		//SQL文（一時テーブルを作成）
+		String preSQL = "create temporary table temporary_table (user_id varchar(10) primary key, pass varchar(255), mail varchar(100), name varchar(40), age integer)";
+		try (PreparedStatement prepstmt = conn.prepareStatement(preSQL)) {
+			prepstmt.executeUpdate();
+			System.out.println("一時テーブルを作成しました");
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}		
+		//SQL文（一時保存）
 		String sql = "insert into temporary_table (user_Id, pass, mail, name, age) values(?, ?, ?, ?, ?)";	
-		try (PreparedStatement pstmt = conn.prepareStatement(sql)) {					
+		try (PreparedStatement pstmt = conn.prepareStatement(sql)) {			
 			pstmt.setString(1, user.getRUserId());
 			pstmt.setString(2, hashedPass);
 			pstmt.setString(3, user.getRMail());
