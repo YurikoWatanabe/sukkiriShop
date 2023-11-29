@@ -12,7 +12,7 @@ public class LoginLogicTest {
 	}
 	
 	public static void testExecuteOK() {
-		Login login = new Login("minato", "1234");
+		Login login = new Login("minato", "minato1234");
 		LoginLogic bo = new LoginLogic();
 		boolean result = bo.execute(login);
 		

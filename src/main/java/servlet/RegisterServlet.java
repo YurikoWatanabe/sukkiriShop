@@ -17,6 +17,9 @@ import model.User;
 @WebServlet("/RegisterServlet")
 public class RegisterServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
+	
+	//Userクラスのインスタンスをフィールドとして定義
+	private User user;
 
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 		//ユーザー登録画面へフォワードする		
@@ -36,31 +39,36 @@ public class RegisterServlet extends HttpServlet {
 		Integer rAge = 0;
 		if (rAgeStr != null && !rAgeStr.isEmpty()) {
 			rAge = Integer.parseInt(rAgeStr);
-		} 			
+		}
+		//入力値をセッションへ個別で保存（Userクラスにはパスワードも含まれているため）
+		HttpSession session = request.getSession();
+		session.setAttribute("rUserId", rUserId);
+		session.setAttribute("rMail", rMail);
+		session.setAttribute("rName", rName);
+		session.setAttribute("rAge", rAge);
+		
+		//セッションへ保存したデータを変数に格納
+		String sUserId = (String)session.getAttribute("rUserId");
+		String sMail = (String)session.getAttribute("rMail");
+		String sName = (String)session.getAttribute("rName");
+		Integer sAge = (Integer)session.getAttribute("rAge");
 		
 		//リクエストパラメータ（hidden）
 		String action = request.getParameter("action");
 		
 		//BOクラス、Userクラスをインスタンス化
 		ResisterConfirmLogic bo = new ResisterConfirmLogic();		
-		User user = new User(rUserId, rPass, rPass2, rMail, rName, rAge);	
+		user = new User(rUserId, rPass, rPass2, rMail, rName, rAge);	
 		
 		//actionパラメータによって処理振り分け
 		//actionパラメータがnullなら入力値チェック～セッションへ保存とrUserIdとrPassのみDBへ保存（トランザクション）
 		if (action == null) {
-			//入力値チェックと1回目のDB保存実行					
-			boolean confirmResult = bo.confirm(user);
-			
-			//入力値を個別で保存（Userクラスにはパスワードも含まれているため）
-			HttpSession session = request.getSession();
-			session.setAttribute("rUserId", rUserId);
-			session.setAttribute("rMail", rMail);
-			session.setAttribute("rName", rName);
-			session.setAttribute("rAge", rAge);
+			//入力値チェックとDB仮保存実行					
+			boolean confirmResult = bo.confirm(user);			
 			
 			//入力値チェックがtrueならトランザクション実行
 			if (confirmResult == true) {
-				TransactionStatus traResult = bo.firstSecondSave(user, action);
+				TransactionStatus traResult = bo.traSaveUser(user, action);
 				//トランザクションの結果によって分岐/PENDINGなら確認画面へフォワード
 				if (traResult == TransactionStatus.PENDING) {
 					RequestDispatcher dispatcher = request.getRequestDispatcher("WEB-INF/jsp/registerConfilm.jsp");
@@ -73,9 +81,10 @@ public class RegisterServlet extends HttpServlet {
 			} else {
 				response.sendRedirect("RegisterServlet");
 			}	
+			
 		//actionパラメータがdoneなら2回目のトランザクション実行
 		} else if (action.equals("done")) {
-			TransactionStatus traResult2 = bo.firstSecondSave(user, action);
+			TransactionStatus traResult2 = bo.traSaveUser(user, action);		
 			//トランザクションの結果によって分岐/SUCCESSならトップ画面へフォワード
 			if (traResult2 == TransactionStatus.SUCCESS) {
 				RequestDispatcher dispatcher = request.getRequestDispatcher("WEB-INF/jsp/loginOK.jsp");

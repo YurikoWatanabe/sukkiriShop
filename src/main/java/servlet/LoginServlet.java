@@ -42,10 +42,6 @@ public class LoginServlet extends HttpServlet {
 		} else {
 			//resultがfalseならリダイレクト
 			response.sendRedirect("LoginServlet");
-		}
-		
-		
-		
+		}		
 	}
-
 }
